@@ -819,9 +819,36 @@
 <script>
 const CLAUDE_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-20250514";
+  // ── ADD GEMINI CONFIG HERE ──
+const GEMINI_API_KEY = "AIzaSyCRMlhFh15Qn0eIwn5FbCvLX7OLyObz6J4"; 
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 // ── Helpers ──
-function switchPanel(id) {
+// ── Helpers ──
+function switchPanel(id) { ... }
+
+async function callClaude(prompt, systemPrompt = '') { ... }
+
+// ── ADD THIS NEW FUNCTION HERE ──
+async function callGemini(prompt, systemInstruction = "") {
+  const fullPrompt = systemInstruction 
+    ? `System Instruction: ${systemInstruction}\n\nUser Request: ${prompt}`
+    : prompt;
+
+  const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: fullPrompt }] }]
+    })
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message || "Gemini API Error");
+  
+  return data.candidates[0].content.parts[0].text;
+}
+  function switchPanel(id) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + id).classList.add('active');
@@ -1100,20 +1127,22 @@ async function generatePitch() {
   document.getElementById('pitchOutput').style.display = 'block';
 
   const out = document.getElementById('pitchAIOutput');
-  out.textContent = 'Crafting your pitch deck...';
+  out.textContent = 'Crafting your pitch deck with Gemini...';
   out.classList.add('loading');
 
   try {
-    const resp = await callClaude(
-      `Create a complete film pitch deck for:\nTitle: ${title}\nGenre: ${genre}\nLogline: ${logline}\nBudget: ${budget}\nTarget Audience: ${audience}\nUSP: ${usp}\n\nWrite content for each of these slides:\n1. TITLE SLIDE — Tagline and mood\n2. THE STORY — Logline + 3-paragraph synopsis\n3. WHY NOW — Market context, current demand\n4. TARGET AUDIENCE — Detailed audience profile\n5. COMPARABLE FILMS — 3 comps with box office\n6. THE TEAM — Director, key creative team (placeholders if unknown)\n7. PRODUCTION PLAN — Timeline, key milestones\n8. BUDGET OVERVIEW — Budget breakdown tiers\n9. DISTRIBUTION STRATEGY — Theatrical, OTT, international\n10. THE ASK — Investment ask, what it covers, ROI model\n\nFormat as: SLIDE X: [TITLE] followed by the content. Be professional, persuasive, and concise.`,
-      'You are a senior film producer and pitch consultant with 20 years experience raising finance for Indian and international films. Write professionally.'
+    // Calling your new Gemini helper
+    const resp = await callGemini(
+      `Create a complete film pitch deck for:\nTitle: ${title}\nGenre: ${genre}\nLogline: ${logline}\nBudget: ${budget}\nTarget Audience: ${audience}\nUSP: ${usp}\n\nWrite content for each of these slides: TITLE, STORY, WHY NOW, AUDIENCE, COMPS, TEAM, PLAN, BUDGET, DISTRIBUTION, THE ASK.`,
+      'You are a senior film producer and pitch consultant.'
     );
     out.textContent = resp;
   } catch(e) {
-    out.textContent = '⚠ Could not connect to AI. Please check your connection and try again.';
+    out.textContent = '⚠ Gemini Error: ' + e.message;
   }
+  
   out.classList.remove('loading');
-  btn.disabled = false; btn.textContent = 'Generate Pitch Deck Content';
+  btn.disabled = false; btn.textContent = 'Generate Pitch Content';
   addToRecent(title + ' (Pitch)');
 }
 
