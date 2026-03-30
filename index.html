@@ -779,6 +779,7 @@
 <script>
 const CLAUDE_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-20250514";
+const ENVATO_TOKEN = "Tt0PSOUAqm6i0EKH3Vpeo6pIc57Ol2mP";
 
 // ── Helpers ──
 function switchPanel(id) {
@@ -930,8 +931,6 @@ async function generateCodes() {
 }
 
 // ── MEDIA SEARCH ──
-function setMediaQuery(q) { document.getElementById('mediaQuery').value = q; }
-
 async function searchMedia() {
   const query = document.getElementById('mediaQuery').value.trim();
   if (!query) { alert('Enter a search query.'); return; }
@@ -943,50 +942,106 @@ async function searchMedia() {
   const photosGrid = document.getElementById('photosGrid');
   const videosList = document.getElementById('videosList');
   const aiOut = document.getElementById('mediaAIOutput');
-  photosGrid.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Loading photos...</div>';
-  videosList.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Loading videos...</div>';
+  photosGrid.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Searching Envato Elements...</div>';
+  videosList.innerHTML = '';
   aiOut.textContent = 'Getting AI recommendations...';
   aiOut.classList.add('loading');
 
-  // Unsplash (no key needed for source.unsplash.com browse links)
-  const unsplashTerms = encodeURIComponent(query);
-  const pexelsSearch = encodeURIComponent(query);
+  // ── ENVATO PHOTOS ──
+  try {
+    const photoRes = await fetch(
+      `https://api.envato.com/v1/discovery/search/search/item?term=${encodeURIComponent(query)}&site=graphicriver.net&sort_by=relevance&page_size=6`,
+      { headers: { Authorization: `Bearer ${ENVATO_TOKEN}` } }
+    );
+    const photoData = await photoRes.json();
+    const photos = photoData.matches || [];
 
-  // Build Unsplash search cards (direct to search page + thumbnail via source)
-  const seeds = [101,202,303,404,505,606];
-  photosGrid.innerHTML = seeds.map(seed => `
-    <div class="result-card" onclick="window.open('https://unsplash.com/s/photos/${unsplashTerms}','_blank')">
-      <img src="https://source.unsplash.com/320x180/?${unsplashTerms}&sig=${seed}" loading="lazy" onerror="this.src='https://placehold.co/320x180/111/333?text=Unsplash'"/>
-      <div class="result-card-info">
-        <div class="result-card-title">${query}</div>
-        <div class="result-card-meta">Unsplash · Free</div>
-        <a class="result-card-link" href="https://unsplash.com/s/photos/${unsplashTerms}" target="_blank">View on Unsplash →</a>
-      </div>
-    </div>
-  `).join('');
+    if (photos.length) {
+      photosGrid.innerHTML = photos.map(p => `
+        <div class="result-card" onclick="window.open('${p.url}','_blank')">
+          <img src="${p.previews?.icon_with_landscape_preview?.landscape_preview?.url || p.previews?.icon_preview?.icon_url || ''}" 
+               loading="lazy" 
+               onerror="this.src='https://placehold.co/320x180/111/333?text=Envato'"/>
+          <div class="result-card-info">
+            <div class="result-card-title">${p.name}</div>
+            <div class="result-card-meta">by ${p.author_username} · GraphicRiver</div>
+            <a class="result-card-link" href="${p.url}" target="_blank">View on Envato →</a>
+          </div>
+        </div>`).join('');
+    } else {
+      photosGrid.innerHTML = `
+        <div class="music-item" onclick="window.open('https://elements.envato.com/photos/${encodeURIComponent(query)}','_blank')">
+          <div class="music-icon">🖼️</div>
+          <div class="music-info">
+            <div class="music-title">Browse "${query}" Photos on Envato Elements</div>
+            <div class="music-meta">Included in your subscription · Unlimited downloads</div>
+          </div>
+          <a class="music-link" href="https://elements.envato.com/photos/${encodeURIComponent(query)}" target="_blank">Browse →</a>
+        </div>`;
+    }
+  } catch(e) {
+    photosGrid.innerHTML = `
+      <div class="music-item" onclick="window.open('https://elements.envato.com/photos/${encodeURIComponent(query)}','_blank')">
+        <div class="music-icon">🖼️</div>
+        <div class="music-info">
+          <div class="music-title">Browse "${query}" on Envato Elements</div>
+          <div class="music-meta">Photos · Included in your subscription</div>
+        </div>
+        <a class="music-link" href="https://elements.envato.com/photos/${encodeURIComponent(query)}" target="_blank">Browse →</a>
+      </div>`;
+  }
 
-  // Pexels video links
-  const videoTerms = [query, query + ' cinematic', query + ' slow motion'];
-  videosList.innerHTML = videoTerms.map((term, i) => `
-    <div class="music-item" onclick="window.open('https://www.pexels.com/search/videos/${encodeURIComponent(term)}/','_blank')">
-      <div class="music-icon">🎞️</div>
-      <div class="music-info">
-        <div class="music-title">${term}</div>
-        <div class="music-meta">Pexels · Free Stock Video · Search #${i+1}</div>
-      </div>
-      <a class="music-link" href="https://www.pexels.com/search/videos/${encodeURIComponent(term)}/" target="_blank">Open →</a>
-    </div>
-  `).join('');
+  // ── ENVATO VIDEOS ──
+  try {
+    const videoRes = await fetch(
+      `https://api.envato.com/v1/discovery/search/search/item?term=${encodeURIComponent(query)}&site=videohive.net&sort_by=relevance&page_size=4`,
+      { headers: { Authorization: `Bearer ${ENVATO_TOKEN}` } }
+    );
+    const videoData = await videoRes.json();
+    const videos = videoData.matches || [];
 
-  // AI recommendation
+    if (videos.length) {
+      videosList.innerHTML = videos.map(v => `
+        <div class="music-item" onclick="window.open('${v.url}','_blank')">
+          <div class="music-icon">🎬</div>
+          <div class="music-info">
+            <div class="music-title">${v.name}</div>
+            <div class="music-meta">by ${v.author_username} · VideoHive · ${v.rating?.rating ? '★ ' + v.rating.rating : ''}</div>
+          </div>
+          <a class="music-link" href="${v.url}" target="_blank">View →</a>
+        </div>`).join('');
+    } else {
+      videosList.innerHTML = `
+        <div class="music-item" onclick="window.open('https://elements.envato.com/stock-video/${encodeURIComponent(query)}','_blank')">
+          <div class="music-icon">🎬</div>
+          <div class="music-info">
+            <div class="music-title">Browse "${query}" Videos on Envato Elements</div>
+            <div class="music-meta">Stock Video · Included in your subscription</div>
+          </div>
+          <a class="music-link" href="https://elements.envato.com/stock-video/${encodeURIComponent(query)}" target="_blank">Browse →</a>
+        </div>`;
+    }
+  } catch(e) {
+    videosList.innerHTML = `
+      <div class="music-item" onclick="window.open('https://elements.envato.com/stock-video/${encodeURIComponent(query)}','_blank')">
+        <div class="music-icon">🎬</div>
+        <div class="music-info">
+          <div class="music-title">Browse "${query}" Videos on Envato Elements</div>
+          <div class="music-meta">Stock Video · Included in your subscription</div>
+        </div>
+        <a class="music-link" href="https://elements.envato.com/stock-video/${encodeURIComponent(query)}" target="_blank">Browse →</a>
+      </div>`;
+  }
+
+  // ── AI RECOMMENDATION ──
   try {
     const resp = await callClaude(
-      `A film production team is looking for visual references and stock media for: "${query}"\n\nProvide:\n1. Specific search terms to find the best results on Unsplash and Pexels\n2. Visual composition tips for this type of shot\n3. Color grading suggestions\n4. What to avoid in stock footage for this type of scene\n\nBe practical and concise.`,
-      'You are a cinematographer and film visual researcher. Respond in plain text, no markdown.'
+      `A film production team is searching for "${query}" on Envato Elements. Give: 3 better search terms to find cinematic results, color grading tips, and what to look for in stock footage for this type of scene.`,
+      'You are a cinematographer. Respond in plain text, no markdown.'
     );
     aiOut.textContent = resp;
   } catch(e) {
-    aiOut.textContent = '⚠ AI offline. Browse the links above directly.';
+    aiOut.textContent = 'Browse the Envato results above for your production needs.';
   }
   aiOut.classList.remove('loading');
   btn.disabled = false; btn.textContent = 'Search';
@@ -1005,40 +1060,68 @@ async function findMusic() {
   document.getElementById('musicOutput').style.display = 'block';
 
   const aiOut = document.getElementById('musicAIOutput');
-  aiOut.textContent = 'Analysing scene and generating recommendations...';
-  aiOut.classList.add('loading');
-
   const musicLinks = document.getElementById('musicLinks');
-  const searchTerms = [
-    mood || scene.split(' ').slice(0,3).join(' '),
-    context.toLowerCase().replace(/ /g, '-'),
-    (mood + ' film score').trim()
-  ];
+  aiOut.textContent = 'Searching Envato Elements...';
+  aiOut.classList.add('loading');
+  musicLinks.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Loading tracks...</div>';
 
-  musicLinks.innerHTML = [
-    { label: `AudioJungle — "${mood || context}"`, url: `https://audiojungle.net/search?term=${encodeURIComponent(mood||context)}&category=music` },
-    { label: `Envato Elements — "${context}"`, url: `https://elements.envato.com/audio/music?q=${encodeURIComponent(mood||context)}` },
-    { label: `Envato Elements — Film Score`, url: `https://elements.envato.com/audio/music?q=${encodeURIComponent((mood||'') + ' film score cinemati')}` },
-    { label: `AudioJungle — Cinematic Tracks`, url: `https://audiojungle.net/search?term=cinematic+${encodeURIComponent(mood||'drama')}&category=music` },
-  ].map(item => `
-    <div class="music-item" onclick="window.open('${item.url}','_blank')">
-      <div class="music-icon">🎵</div>
-      <div class="music-info">
-        <div class="music-title">${item.label}</div>
-        <div class="music-meta">Envato · Licensed music for production use</div>
-      </div>
-      <a class="music-link" href="${item.url}" target="_blank">Browse →</a>
-    </div>
-  `).join('');
+  const searchTerm = mood || scene.split(' ').slice(0,3).join(' ');
 
+  // ── ENVATO ELEMENTS SEARCH ──
+  try {
+    const res = await fetch(
+      `https://api.envato.com/v1/discovery/search/search/item?term=${encodeURIComponent(searchTerm)}&site=audiojungle.net&sort_by=relevance&page_size=6`,
+      { headers: { Authorization: `Bearer ${ENVATO_TOKEN}` } }
+    );
+    const data = await res.json();
+    const items = data.matches || [];
+
+    if (items.length) {
+      musicLinks.innerHTML = items.map(item => `
+        <div class="music-item" onclick="window.open('${item.url}','_blank')">
+          <div class="music-icon">🎵</div>
+          <div class="music-info">
+            <div class="music-title">${item.name}</div>
+            <div class="music-meta">
+              by ${item.author_username} · 
+              $${item.price_cents ? (item.price_cents/100).toFixed(2) : 'Included'} · 
+              AudioJungle
+            </div>
+          </div>
+          <a class="music-link" href="${item.url}" target="_blank">Listen →</a>
+        </div>`).join('');
+    } else {
+      musicLinks.innerHTML = `
+        <div class="music-item" onclick="window.open('https://audiojungle.net/search?term=${encodeURIComponent(searchTerm)}','_blank')">
+          <div class="music-icon">🎵</div>
+          <div class="music-info">
+            <div class="music-title">Search "${searchTerm}" on AudioJungle</div>
+            <div class="music-meta">Click to browse Envato Elements music</div>
+          </div>
+          <a class="music-link" href="https://audiojungle.net/search?term=${encodeURIComponent(searchTerm)}" target="_blank">Browse →</a>
+        </div>`;
+    }
+  } catch(e) {
+    musicLinks.innerHTML = `
+      <div class="music-item" onclick="window.open('https://audiojungle.net/search?term=${encodeURIComponent(searchTerm)}','_blank')">
+        <div class="music-icon">🎵</div>
+        <div class="music-info">
+          <div class="music-title">Browse "${searchTerm}" on AudioJungle</div>
+          <div class="music-meta">Envato Elements · Licensed Music</div>
+        </div>
+        <a class="music-link" href="https://audiojungle.net/search?term=${encodeURIComponent(searchTerm)}" target="_blank">Browse →</a>
+      </div>`;
+  }
+
+  // ── AI MUSIC RECOMMENDATION ──
   try {
     const resp = await callClaude(
-      `Film scene details:\nMood/Style: ${mood}\nUsage: ${context}\nScene: ${scene}\n\nAs a professional film music supervisor, provide:\n1. Exact music genre and sub-genre recommendations for Envato/AudioJungle search\n2. Instrumentation suggestions\n3. BPM range and tempo feel\n4. 3-5 specific search keywords to use on AudioJungle\n5. Licensing advice for production use\n\nBe specific and practical.`,
-      'You are an experienced film music supervisor with deep knowledge of Envato AudioJungle. Respond in plain text.'
+      `Film scene: ${scene || mood}\nUsage: ${context}\n\nAs a music supervisor, recommend: exact genre, BPM range, instrumentation, and 3 specific search keywords for AudioJungle/Envato Elements. Be concise.`,
+      'You are a film music supervisor. Respond in plain text.'
     );
     aiOut.textContent = resp;
   } catch(e) {
-    aiOut.textContent = '⚠ AI offline. Use the Envato links above to search manually.';
+    aiOut.textContent = 'Browse the Envato tracks above for your scene.';
   }
   aiOut.classList.remove('loading');
   btn.disabled = false; btn.textContent = 'Find Music';
