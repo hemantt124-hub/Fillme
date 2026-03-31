@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Fillme — Film Production AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #222222;
+    --gold: #c9a84c;
+    --gold-dim: #7a6330;
+    --cream: #f0e6cc;
+    --text: #e8e0d0;
+    --muted: #6a6460;
+    --red: #c0392b;
+    --green: #27ae60;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999; opacity: 0.4;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.92);
+    backdrop-filter: blur(12px);
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.12em;
+    color: var(--gold);
+  }
+  .logo span { color: var(--cream); }
+  .header-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 2px;
+  }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    height: calc(100vh - 65px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 24px 0;
+    overflow-y: auto;
+  }
+  .sidebar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    padding: 0 24px 12px;
+  }
+  .tool-btn {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 24px;
+    cursor: pointer;
+    border: none; background: none;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 400;
+    text-align: left;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+    width: 100%;
+  }
+  .tool-btn:hover { color: var(--cream); background: var(--surface); }
+  .tool-btn.active {
+    color: var(--gold);
+    border-left-color: var(--gold);
+    background: rgba(201,168,76,0.06);
+  }
+  .tool-icon {
+    font-size: 1.1rem;
+    width: 22px; text-align: center;
+    flex-shrink: 0;
+  }
+  .sidebar-divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 16px 24px;
+  }
+  .project-list {
+    padding: 0 16px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .project-chip {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    padding: 6px 10px;
+    background: var(--surface);
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .project-chip:hover { color: var(--gold); border-color: var(--gold-dim); }
+
+  /* ── MAIN AREA ── */
+  .main {
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Tool panels */
+  .panel { display: none; flex-direction: column; height: 100%; }
+  .panel.active { display: flex; }
+
+  /* Panel header */
+  .panel-header {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.08em;
+    color: var(--cream);
+    line-height: 1;
+  }
+  .panel-title span { color: var(--gold); }
+  .panel-desc {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 6px;
+    letter-spacing: 0.03em;
+  }
+
+  /* Panel body */
+  .panel-body {
+    flex: 1; overflow-y: auto;
+    padding: 32px 40px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  /* Input rows */
+  .input-group { display: flex; flex-direction: column; gap: 8px; }
+  .input-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+  }
+  .input-row { display: flex; gap: 10px; }
+  input[type=text], select, textarea {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--cream);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 12px 16px;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  input[type=text]:focus, select:focus, textarea:focus {
+    border-color: var(--gold-dim);
+  }
+  select option { background: var(--surface); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* Buttons */
+  .btn-gold {
+    background: var(--gold);
+    color: #0a0a0a;
+    border: none;
+    padding: 12px 24px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .btn-gold:hover { background: var(--cream); transform: translateY(-1px); }
+  .btn-gold:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 10px 18px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-outline:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  /* Result box */
+  .result-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 24px;
+    font-size: 0.85rem;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    color: var(--cream);
+    min-height: 60px;
+    position: relative;
+  }
+  .result-box.loading::after {
+    content: '';
+    display: block; width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-top: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* Code style output */
+  .code-output {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--gold);
+    background: #0d0d0d;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    letter-spacing: 0.04em;
+    line-height: 1.8;
+  }
+
+  /* Tags / chips */
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tag:hover, .tag.active { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,0.06); }
+
+  /* Grid results */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+  .result-card:hover { border-color: var(--gold-dim); }
+  .result-card img {
+    width: 100%; aspect-ratio: 16/9;
+    object-fit: cover; display: block;
+  }
+  .result-card-info { padding: 10px 12px; }
+  .result-card-title { font-size: 0.75rem; color: var(--cream); line-height: 1.4; }
+  .result-card-meta { font-size: 0.65rem; color: var(--muted); margin-top: 4px; font-family: 'DM Mono', monospace; }
+  .result-card-link {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--gold);
+    text-decoration: none;
+    margin-top: 6px;
+    font-family: 'DM Mono', monospace;
+  }
+  .result-card-link:hover { text-decoration: underline; }
+
+  /* Music items */
+  .music-item {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+  .music-item:hover { border-color: var(--gold-dim); }
+  .music-icon { font-size: 1.4rem; flex-shrink: 0; }
+  .music-info { flex: 1; }
+  .music-title { font-size: 0.85rem; color: var(--cream); }
+  .music-meta { font-size: 0.7rem; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+  .music-link {
+    font-size: 0.65rem;
+    color: var(--gold);
+    text-decoration: none;
+    font-family: 'DM Mono', monospace;
+    flex-shrink: 0;
+  }
+
+  /* Project codes */
+  .codes-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .code-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px;
+    transition: border-color 0.2s;
+  }
+  .code-card:hover { border-color: var(--gold-dim); }
+  .code-card-label {
+    font-size: 0.6rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  .code-card-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+  }
+  .copy-btn {
+    margin-top: 8px; background: none; border: 1px solid var(--border);
+    color: var(--muted); font-size: 0.65rem; padding: 3px 8px;
+    border-radius: 2px; cursor: pointer; font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  /* Pitch deck slides preview */
+  .slide-preview {
+    background: #fff;
+    border-radius: 6px;
+    aspect-ratio: 16/9;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    position: relative; overflow: hidden;
+  }
+  .slide-dark {
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1208 100%);
+    border: 2px solid var(--gold-dim);
+  }
+
+  /* Status pill */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.65rem; font-family: 'DM Mono', monospace;
+    padding: 3px 10px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+  }
+  .status-pill.ok { background: rgba(39,174,96,0.1); color: var(--green); border: 1px solid rgba(39,174,96,0.3); }
+  .status-pill.warn { background: rgba(201,168,76,0.1); color: var(--gold); border: 1px solid var(--gold-dim); }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+  .flex-row { display: flex; gap: 12px; }
+  .flex-1 { flex: 1; }
+  .mt-sm { margin-top: 8px; }
+  .mt-md { margin-top: 16px; }
+  .error-text { color: #e74c3c; font-size: 0.8rem; }
+  .hint { font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+
+  @media (max-width: 768px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .panel-body { padding: 20px; }
+    .codes-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Fill<span>me</span></div>
+  <div class="header-badge">Film Production AI · v1.0</div>
+</header>
+
+<div class="app">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-label">Tools</div>
+    <button class="tool-btn active" onclick="switchPanel('codes', this)">
+      <span class="tool-icon">🎬</span> Project Codes
+    </button>
+    <button class="tool-btn" onclick="switchPanel('media', this)">
+      <span class="tool-icon">🖼️</span> Find Photos & Videos
+    </button>
+    <button class="tool-btn" onclick="switchPanel('music', this)">
+      <span class="tool-icon">🎵</span> Music from Envato
+    </button>
+    <button class="tool-btn" onclick="switchPanel('pitch', this)">
+      <span class="tool-icon">📊</span> Pitch Deck
+    </button>
+    <button class="tool-btn" onclick="switchPanel('qnap', this)">
+      <span class="tool-icon">🗄️</span> My QNAP Library
+    </button>
+
+    <hr class="sidebar-divider"/>
+
+    <div class="sidebar-label">Recent Projects</div>
+    <div class="project-list" id="recentProjects">
+      <div class="project-chip">No projects yet</div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ── PANEL: PROJECT CODES ── -->
+    <div class="panel active" id="panel-codes">
+      <div class="panel-header">
+        <div class="panel-title">Project <span>Code Generator</span></div>
+        <div class="panel-desc">Your format: <span style="font-family:'DM Mono',monospace;color:var(--gold);font-size:0.85rem">[Month Letter] / [Year] / [Client Initials] / [Serial No]</span> &nbsp;·&nbsp; e.g. <span style="font-family:'DM Mono',monospace;color:var(--cream)">C/2026/TM/001</span></div>
+      </div>
+      <div class="panel-body">
+
+        <!-- Month legend -->
+        <div class="input-group">
+          <div class="input-label">Month Reference</div>
+          <div class="tags" id="monthLegend">
+            <span class="tag" title="January">A · Jan</span>
+            <span class="tag" title="February">B · Feb</span>
+            <span class="tag" title="March">C · Mar</span>
+            <span class="tag" title="April">D · Apr</span>
+            <span class="tag" title="May">E · May</span>
+            <span class="tag" title="June">F · Jun</span>
+            <span class="tag" title="July">G · Jul</span>
+            <span class="tag" title="August">H · Aug</span>
+            <span class="tag" title="September">I · Sep</span>
+            <span class="tag" title="October">J · Oct</span>
+            <span class="tag" title="November">K · Nov</span>
+            <span class="tag" title="December">L · Dec</span>
+          </div>
+        </div>
+
+        <div class="flex-row">
+          <div class="input-group flex-1">
+            <div class="input-label">Project Month</div>
+            <select id="codeMonth">
+              <option value="A">A — January</option>
+              <option value="B">B — February</option>
+              <option value="C">C — March</option>
+              <option value="D">D — April</option>
+              <option value="E">E — May</option>
+              <option value="F">F — June</option>
+              <option value="G">G — July</option>
+              <option value="H">H — August</option>
+              <option value="I">I — September</option>
+              <option value="J">J — October</option>
+              <option value="K">K — November</option>
+              <option value="L">L — December</option>
+            </select>
+          </div>
+          <div class="input-group flex-1">
+            <div class="input-label">Year</div>
+            <input type="text" id="codeYear" placeholder="2026" maxlength="4"/>
+          </div>
+        </div>
+
+        <div class="flex-row">
+          <div class="input-group flex-1">
+            <div class="input-label">Client Full Name</div>
+            <input type="text" id="codeClientName" placeholder="e.g. Tata 1MG, Reliance Jio, Zomato"/>
+          </div>
+          <div class="input-group" style="width:160px;flex-shrink:0">
+            <div class="input-label">Client Initials <span style="color:var(--muted)">(auto)</span></div>
+            <input type="text" id="codeClientInitials" placeholder="e.g. TM" maxlength="6" style="font-family:'DM Mono',monospace;letter-spacing:0.1em;text-transform:uppercase"/>
+          </div>
+        </div>
+
+        <div class="flex-row">
+          <div class="input-group flex-1">
+            <div class="input-label">Project / Film Title</div>
+            <input type="text" id="codeTitle" placeholder="e.g. Summer Campaign 2026"/>
+          </div>
+          <div class="input-group" style="width:160px;flex-shrink:0">
+            <div class="input-label">Serial Number</div>
+            <input type="text" id="codeSerial" placeholder="001" maxlength="4" style="font-family:'DM Mono',monospace"/>
+          </div>
+        </div>
+
+        <!-- Live preview -->
+        <div class="input-group">
+          <div class="input-label">Live Code Preview</div>
+          <div class="code-output" id="codePreview" style="font-size:1.4rem;letter-spacing:0.15em;text-align:center;padding:20px">
+            — / — / — / —
+          </div>
+        </div>
+
+        <div>
+          <button class="btn-gold" onclick="generateCodes()" id="codeBtn">Generate &amp; Save Project Code</button>
+        </div>
+
+        <div id="codesOutput" style="display:none">
+          <div class="result-tag">All Generated Codes for this Project</div>
+          <div class="codes-grid" id="codesGrid"></div>
+          <div class="mt-md result-box" id="codesAIOutput"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PANEL: MEDIA ── -->
+    <div class="panel" id="panel-media">
+      <div class="panel-header">
+        <div class="panel-title">Find <span>Photos & Videos</span></div>
+        <div class="panel-desc">Search Unsplash (photos) and Pexels (videos) for your production needs.</div>
+      </div>
+      <div class="panel-body">
+        <div class="input-group">
+          <div class="input-label">Describe what you need</div>
+          <div class="input-row">
+            <input type="text" id="mediaQuery" placeholder="e.g. dramatic rain cityscape night, actor close-up golden hour"/>
+            <button class="btn-gold" onclick="searchMedia()" id="mediaBtn">Search</button>
+          </div>
+        </div>
+        <div class="tags" id="mediaTags">
+          <span class="tag" onclick="setMediaQuery('cinematic landscape')">Cinematic Landscape</span>
+          <span class="tag" onclick="setMediaQuery('dramatic lighting portrait')">Dramatic Portrait</span>
+          <span class="tag" onclick="setMediaQuery('film set behind the scenes')">Behind the Scenes</span>
+          <span class="tag" onclick="setMediaQuery('golden hour silhouette')">Golden Hour</span>
+          <span class="tag" onclick="setMediaQuery('urban night rain')">Urban Night</span>
+          <span class="tag" onclick="setMediaQuery('crowd scene')">Crowd Scene</span>
+        </div>
+        <div id="mediaOutput" style="display:none">
+          <div class="result-tag">📷 Photos — Unsplash</div>
+          <div class="results-grid" id="photosGrid"></div>
+          <div class="result-tag mt-md">🎞️ Videos — Pexels</div>
+          <div id="videosList" style="display:flex;flex-direction:column;gap:10px;"></div>
+          <div class="result-box mt-md" id="mediaAIOutput"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PANEL: MUSIC ── -->
+    <div class="panel" id="panel-music">
+      <div class="panel-header">
+        <div class="panel-title">Music from <span>Envato</span></div>
+        <div class="panel-desc">Search Envato Elements & AudioJungle for licensed production music.</div>
+      </div>
+      <div class="panel-body">
+        <div class="flex-row">
+          <div class="input-group flex-1">
+            <div class="input-label">Mood / Style</div>
+            <input type="text" id="musicMood" placeholder="e.g. epic orchestral, sad piano, suspenseful"/>
+          </div>
+          <div class="input-group flex-1">
+            <div class="input-label">Usage Context</div>
+            <select id="musicContext">
+              <option>Opening Titles</option>
+              <option>Action Sequence</option>
+              <option>Emotional Scene</option>
+              <option>Background Ambient</option>
+              <option>Climax</option>
+              <option>End Credits</option>
+              <option>Trailer</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <div class="input-label">Scene Description (for AI recommendations)</div>
+          <textarea id="musicScene" placeholder="e.g. Two estranged siblings meet after 10 years at their father's funeral. Slow dramatic reveal, heavy rain."></textarea>
+        </div>
+        <button class="btn-gold" onclick="findMusic()" id="musicBtn">Find Music</button>
+
+        <div id="musicOutput" style="display:none">
+          <div class="result-tag">AI Recommendation</div>
+          <div class="result-box" id="musicAIOutput"></div>
+          <div class="result-tag mt-md">Envato Search Links</div>
+          <div id="musicLinks" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PANEL: PITCH DECK ── -->
+    <div class="panel" id="panel-pitch">
+      <div class="panel-header">
+        <div class="panel-title">Pitch <span>Deck Builder</span></div>
+        <div class="panel-desc">Generate pitch content + find matching Canva designs & posters from your account.</div>
+      </div>
+      <div class="panel-body">
+
+        <!-- Two column layout: form + canva search -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+          <!-- LEFT: Pitch Form -->
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div class="result-tag" style="margin:0">📝 Pitch Details</div>
+            <div class="input-group">
+              <div class="input-label">Film Title</div>
+              <input type="text" id="pitchTitle" placeholder="e.g. Monsoon Requiem"/>
+            </div>
+            <div class="input-group">
+              <div class="input-label">Genre</div>
+              <input type="text" id="pitchGenre" placeholder="e.g. Psychological Drama"/>
+            </div>
+            <div class="input-group">
+              <div class="input-label">Logline</div>
+              <textarea id="pitchLogline" placeholder="e.g. A grieving composer discovers his wife's final message..." style="min-height:60px"></textarea>
+            </div>
+            <div class="input-group">
+              <div class="input-label">Budget Range</div>
+              <select id="pitchBudget">
+                <option>Under ₹50 Lakhs</option>
+                <option>₹50L – ₹2 Crore</option>
+                <option>₹2Cr – ₹10 Crore</option>
+                <option>₹10Cr – ₹50 Crore</option>
+                <option>₹50 Crore+</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <div class="input-label">Target Audience</div>
+              <input type="text" id="pitchAudience" placeholder="e.g. 25-45, multiplex, OTT"/>
+            </div>
+            <div class="input-group">
+              <div class="input-label">Why this film? (USP)</div>
+              <textarea id="pitchUSP" placeholder="e.g. Inspired by true events..." style="min-height:60px"></textarea>
+            </div>
+            <button class="btn-gold" onclick="generatePitch()" id="pitchBtn">Generate Pitch Content</button>
+          </div>
+
+          <!-- RIGHT: Canva Design Search -->
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div class="result-tag" style="margin:0">🎨 Canva Designs & Posters</div>
+
+            <div class="input-group">
+              <div class="input-label">Search Your Canva Designs</div>
+              <div class="input-row">
+                <input type="text" id="canvaQuery" placeholder="e.g. pitch deck, film poster, proposal"/>
+                <button class="btn-gold" onclick="searchCanvaDesigns()" id="canvaSearchBtn">Search</button>
+              </div>
+            </div>
+
+            <!-- Quick search tags -->
+            <div class="tags">
+              <span class="tag" onclick="quickCanvaSearch('pitch deck')">Pitch Deck</span>
+              <span class="tag" onclick="quickCanvaSearch('film poster')">Film Poster</span>
+              <span class="tag" onclick="quickCanvaSearch('presentation')">Presentation</span>
+              <span class="tag" onclick="quickCanvaSearch('proposal')">Proposal</span>
+              <span class="tag" onclick="quickCanvaSearch('mood board')">Mood Board</span>
+              <span class="tag" onclick="loadAllCanvaDesigns()">All Designs</span>
+            </div>
+
+            <!-- Canva results -->
+            <div id="canvaResults" style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;">
+              <div class="hint" style="text-align:center;padding:20px">
+                Search your Canva library or click a tag above to browse your designs 🎨
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pitch Output (full width) -->
+        <div id="pitchOutput" style="display:none">
+          <div class="result-tag">Generated Pitch Content</div>
+          <div class="result-box" id="pitchAIOutput"></div>
+          <div class="mt-md" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-gold" onclick="searchCanvaAfterPitch()" id="canvaAutoBtn">🎨 Find Matching Canva Designs</button>
+            <span class="hint">Auto-searches Canva based on your film title & genre</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── PANEL: QNAP ── -->
+    <div class="panel" id="panel-qnap">
+      <div class="panel-header">
+        <div class="panel-title">My <span>QNAP Library</span></div>
+        <div class="panel-desc">Browse and search your raw footage, photos, project files & audio directly from your NAS.</div>
+      </div>
+      <div class="panel-body">
+
+        <!-- Connection Settings Card -->
+        <div id="qnapSettings">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div class="result-tag" style="margin:0">QNAP Connection Settings</div>
+              <div id="qnapStatus" class="status-pill warn"><span class="dot"></span>Not Connected</div>
+            </div>
+
+            <div class="flex-row">
+              <div class="input-group flex-1">
+                <div class="input-label">QNAP Address</div>
+                <input type="text" id="qnapHost" placeholder="yourname.myqnapcloud.com  or  192.168.1.100"/>
+              </div>
+              <div class="input-group" style="width:110px;flex-shrink:0">
+                <div class="input-label">Port</div>
+                <input type="text" id="qnapPort" placeholder="8080" value="8080"/>
+              </div>
+            </div>
+
+            <div class="flex-row">
+              <div class="input-group flex-1">
+                <div class="input-label">Username</div>
+                <input type="text" id="qnapUser" placeholder="e.g. cineagent"/>
+              </div>
+              <div class="input-group flex-1">
+                <div class="input-label">Password</div>
+                <input type="password" id="qnapPass" placeholder="••••••••"/>
+              </div>
+            </div>
+
+            <div class="input-group">
+              <div class="input-label">Media Root Folders (comma separated)</div>
+              <input type="text" id="qnapFolders" placeholder="/Footage, /Photos, /Projects, /Music" value="/Footage, /Photos, /Projects, /Music"/>
+            </div>
+
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <button class="btn-gold" onclick="qnapConnect()" id="qnapConnectBtn">Connect to QNAP</button>
+              <button class="btn-outline" onclick="qnapSaveSettings()">Save Settings</button>
+              <span class="hint" style="flex:1">Settings are saved locally in your browser.</span>
+            </div>
+
+            <div class="hint" style="background:#0d0d0d;border:1px solid var(--border);border-radius:4px;padding:12px;line-height:1.8">
+              ⚠️ <strong style="color:var(--cream)">CORS Note:</strong> QNAP's API may block direct browser requests. If connection fails, you'll need to either:<br>
+              1. Enable CORS on your QNAP (Control Panel → Application Server → Web Server → CORS)<br>
+              2. Or use a simple proxy — ask me and I'll provide a one-click Node.js proxy script.
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Bar (shown after connect) -->
+        <div id="qnapSearchBar" style="display:none">
+          <div class="input-group">
+            <div class="input-label">Search Your Library</div>
+            <div class="input-row">
+              <input type="text" id="qnapSearchQuery" placeholder="e.g. Jaipur shoot, client name, project code C/2026/TM"/>
+              <select id="qnapSearchType" style="width:160px;flex-shrink:0">
+                <option value="all">All Files</option>
+                <option value="video">Video Only</option>
+                <option value="photo">Photos Only</option>
+                <option value="audio">Audio Only</option>
+                <option value="project">Project Files</option>
+              </select>
+              <button class="btn-gold" onclick="qnapSearch()" id="qnapSearchBtn">Search</button>
+            </div>
+          </div>
+
+          <!-- Folder tabs -->
+          <div class="tags" id="qnapFolderTabs" style="margin-top:4px"></div>
+        </div>
+
+        <!-- Results -->
+        <div id="qnapResults" style="display:none">
+          <div class="result-tag" id="qnapResultsLabel">Results</div>
+          <div id="qnapResultsGrid" class="results-grid"></div>
+          <div id="qnapFileList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+
+        <!-- AI Suggestion -->
+        <div id="qnapAIWrap" style="display:none">
+          <div class="result-tag">AI File Suggestion</div>
+          <div class="result-box" id="qnapAIOutput"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// 🔑 PASTE YOUR API KEYS HERE
+// ════════════════════════════════════════
+const GEMINI_API_KEY   = "PASTE-YOUR-GEMINI-API-KEY-HERE";
+const ENVATO_TOKEN     = "PASTE-YOUR-ENVATO-TOKEN-HERE";
+// ════════════════════════════════════════
+
+const GEMINI_API = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const CANVA_MCP  = "https://mcp.canva.com/mcp";
+
+// ── Helpers ──
+function switchPanel(id, btnEl) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const panel = document.getElementById('panel-' + id);
+  if (panel) panel.classList.add('active');
+  if (btnEl) btnEl.classList.add('active');
+  // Load QNAP settings when that panel opens
+  if (id === 'qnap') loadQnapSettings();
+}
+
+// ── Gemini AI call (replaces Claude) ──
+async function callClaude(prompt, systemPrompt = '') {
+  const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+  const res = await fetch(GEMINI_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: fullPrompt }] }],
+      generationConfig: { maxOutputTokens: 1500, temperature: 0.7 }
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || 'Gemini API error');
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+function addToRecent(title) {
+  const list = document.getElementById('recentProjects');
+  const existing = [...list.querySelectorAll('.project-chip')].map(c => c.textContent);
+  if (!existing.includes(title)) {
+    const chip = document.createElement('div');
+    chip.className = 'project-chip';
+    chip.textContent = title;
+    if (list.querySelector('.project-chip')?.textContent === 'No projects yet') list.innerHTML = '';
+    list.prepend(chip);
+  }
+}
+
+// ── MONTH MAP ──
+const MONTH_LETTERS = { A:'January',B:'February',C:'March',D:'April',E:'May',F:'June',G:'July',H:'August',I:'September',J:'October',K:'November',L:'December' };
+
+// Single DOMContentLoaded — all init here
+window.addEventListener('DOMContentLoaded', () => {
+  // Auto-set current month & year
+  const monthLetters = 'ABCDEFGHIJKL';
+  const currentMonth = new Date().getMonth();
+  const currentYear  = new Date().getFullYear();
+  const monthSelect  = document.getElementById('codeMonth');
+  const yearInput    = document.getElementById('codeYear');
+  if (monthSelect) monthSelect.value = monthLetters[currentMonth];
+  if (yearInput && !yearInput.value) yearInput.value = currentYear;
+
+  // Highlight current month tag
+  const tags = document.querySelectorAll('#monthLegend .tag');
+  if (tags[currentMonth]) tags[currentMonth].classList.add('active');
+
+  // Auto-generate client initials
+  const clientNameInput    = document.getElementById('codeClientName');
+  const initialsInput      = document.getElementById('codeClientInitials');
+  if (clientNameInput && initialsInput) {
+    clientNameInput.addEventListener('input', () => {
+      const words    = clientNameInput.value.trim().split(/\s+/).filter(Boolean);
+      const initials = words.map(w => w.replace(/[^A-Z0-9]/gi,'').charAt(0).toUpperCase()).join('').substring(0,4);
+      initialsInput.value = initials;
+      updatePreview();
+    });
+  }
+
+  // Live code preview listeners
+  ['codeMonth','codeYear','codeClientInitials','codeSerial'].forEach(elId => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.addEventListener('input', updatePreview);
+    el.addEventListener('change', updatePreview);
+  });
+
+  updatePreview();
+});
+
+function updatePreview() {
+  const month  = (document.getElementById('codeMonth')?.value || '—');
+  const year   = (document.getElementById('codeYear')?.value || '—');
+  const init   = (document.getElementById('codeClientInitials')?.value || '—').toUpperCase();
+  const serial = (document.getElementById('codeSerial')?.value || '—');
+  const preview = document.getElementById('codePreview');
+  if (preview) preview.textContent = `${month} / ${year} / ${init} / ${serial}`;
+}
+
+// ── PROJECT CODES ──
+async function generateCodes() {
+  const month   = document.getElementById('codeMonth').value.trim();
+  const year    = document.getElementById('codeYear').value.trim() || String(new Date().getFullYear());
+  const client  = document.getElementById('codeClientName').value.trim();
+  const initials = document.getElementById('codeClientInitials').value.trim().toUpperCase();
+  const title   = document.getElementById('codeTitle').value.trim();
+  const serial  = document.getElementById('codeSerial').value.trim().padStart(3, '0') || '001';
+
+  if (!initials) { alert('Please enter a client name or initials.'); return; }
+
+  const btn = document.getElementById('codeBtn');
+  btn.disabled = true; btn.textContent = 'Generating...';
+
+  // ── YOUR COMPANY'S CODE FORMAT ──
+  const masterCode  = `${month}/${year}/${initials}/${serial}`;
+  const shootCode   = `${month}/${year}/${initials}/${serial}-SHT`;
+  const assetCode   = `${month}/${year}/${initials}/${serial}-AST`;
+  const editCode    = `${month}/${year}/${initials}/${serial}-EDT`;
+  const budgetCode  = `${month}/${year}/${initials}/${serial}-BDG`;
+  const delivCode   = `${month}/${year}/${initials}/${serial}-DLV`;
+
+  const monthName = MONTH_LETTERS[month] || month;
+
+  const grid = document.getElementById('codesGrid');
+  grid.innerHTML = [
+    ['Master Project Code',  masterCode,  '📁 Use on all files, folders & contracts'],
+    ['Shoot Code',           shootCode,   '🎥 Shoot schedules, call sheets, dailies'],
+    ['Asset Code',           assetCode,   '🖼️ Raw footage, photos, graphics'],
+    ['Edit / Post Code',     editCode,    '✂️ Edit timelines, exports, renders'],
+    ['Budget Code',          budgetCode,  '💰 Invoices, POs, financial docs'],
+    ['Delivery Code',        delivCode,   '📦 Final deliverables to client'],
+  ].map(([label, val, hint]) => `
+    <div class="code-card">
+      <div class="code-card-label">${label}</div>
+      <div class="code-card-value">${val}</div>
+      <div style="font-size:0.65rem;color:var(--muted);margin-top:4px;line-height:1.4">${hint}</div>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('${val}');this.textContent='✓ Copied!';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
+    </div>
+  `).join('');
+
+  document.getElementById('codesOutput').style.display = 'block';
+  const out = document.getElementById('codesAIOutput');
+  out.textContent = 'Getting AI production summary...';
+  out.classList.add('loading');
+
+  try {
+    const resp = await callClaude(
+      `A film production house has just created codes for a new project:\nMaster Code: ${masterCode}\nClient: ${client || initials}\nProject Title: ${title || 'Untitled'}\nMonth: ${monthName} ${year}\n\nProvide:\n1. A short professional project intake summary (2-3 sentences)\n2. A simple file/folder naming convention recommendation using this code\n3. One tip for keeping this project organised during production\n\nBe concise and practical.`,
+      'You are a professional film production coordinator. Respond in plain text, no markdown symbols.'
+    );
+    out.textContent = resp;
+  } catch(e) {
+    out.textContent = `✓ Code generated: ${masterCode}\n\nUse this code as a prefix on all files, folders, invoices, and communications related to this project.`;
+  }
+  out.classList.remove('loading');
+  btn.disabled = false; btn.textContent = 'Generate & Save Project Code';
+  addToRecent(masterCode + (title ? ` · ${title}` : ''));
+}
+
+// ── MEDIA SEARCH ──
+function setMediaQuery(q) { document.getElementById('mediaQuery').value = q; }
+
+async function searchMedia() {
+  const query = document.getElementById('mediaQuery').value.trim();
+  if (!query) { alert('Enter a search query.'); return; }
+
+  const btn = document.getElementById('mediaBtn');
+  btn.disabled = true; btn.textContent = 'Searching...';
+  document.getElementById('mediaOutput').style.display = 'block';
+
+  const photosGrid = document.getElementById('photosGrid');
+  const videosList = document.getElementById('videosList');
+  const aiOut = document.getElementById('mediaAIOutput');
+  photosGrid.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Loading photos...</div>';
+  videosList.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Loading videos...</div>';
+  aiOut.textContent = 'Getting AI recommendations...';
+  aiOut.classList.add('loading');
+
+  // Unsplash (no key needed for source.unsplash.com browse links)
+  const unsplashTerms = encodeURIComponent(query);
+  const pexelsSearch = encodeURIComponent(query);
+
+  // Build Unsplash search cards (direct to search page + thumbnail via source)
+  const seeds = [101,202,303,404,505,606];
+  photosGrid.innerHTML = seeds.map(seed => `
+    <div class="result-card" onclick="window.open('https://unsplash.com/s/photos/${unsplashTerms}','_blank')">
+      <img src="https://source.unsplash.com/320x180/?${unsplashTerms}&sig=${seed}" loading="lazy" onerror="this.src='https://placehold.co/320x180/111/333?text=Unsplash'"/>
+      <div class="result-card-info">
+        <div class="result-card-title">${query}</div>
+        <div class="result-card-meta">Unsplash · Free</div>
+        <a class="result-card-link" href="https://unsplash.com/s/photos/${unsplashTerms}" target="_blank">View on Unsplash →</a>
+      </div>
+    </div>
+  `).join('');
+
+  // Pexels video links
+  const videoTerms = [query, query + ' cinematic', query + ' slow motion'];
+  videosList.innerHTML = videoTerms.map((term, i) => `
+    <div class="music-item" onclick="window.open('https://www.pexels.com/search/videos/${encodeURIComponent(term)}/','_blank')">
+      <div class="music-icon">🎞️</div>
+      <div class="music-info">
+        <div class="music-title">${term}</div>
+        <div class="music-meta">Pexels · Free Stock Video · Search #${i+1}</div>
+      </div>
+      <a class="music-link" href="https://www.pexels.com/search/videos/${encodeURIComponent(term)}/" target="_blank">Open →</a>
+    </div>
+  `).join('');
+
+  // AI recommendation
+  try {
+    const resp = await callClaude(
+      `A film production team is looking for visual references and stock media for: "${query}"\n\nProvide:\n1. Specific search terms to find the best results on Unsplash and Pexels\n2. Visual composition tips for this type of shot\n3. Color grading suggestions\n4. What to avoid in stock footage for this type of scene\n\nBe practical and concise.`,
+      'You are a cinematographer and film visual researcher. Respond in plain text, no markdown.'
+    );
+    aiOut.textContent = resp;
+  } catch(e) {
+    aiOut.textContent = '⚠ AI offline. Browse the links above directly.';
+  }
+  aiOut.classList.remove('loading');
+  btn.disabled = false; btn.textContent = 'Search';
+}
+
+// ── MUSIC ──
+async function findMusic() {
+  const mood = document.getElementById('musicMood').value.trim();
+  const context = document.getElementById('musicContext').value;
+  const scene = document.getElementById('musicScene').value.trim();
+
+  if (!mood && !scene) { alert('Enter a mood or scene description.'); return; }
+
+  const btn = document.getElementById('musicBtn');
+  btn.disabled = true; btn.textContent = 'Finding...';
+  document.getElementById('musicOutput').style.display = 'block';
+
+  const aiOut = document.getElementById('musicAIOutput');
+  aiOut.textContent = 'Analysing scene and generating recommendations...';
+  aiOut.classList.add('loading');
+
+  const musicLinks = document.getElementById('musicLinks');
+  const searchTerms = [
+    mood || scene.split(' ').slice(0,3).join(' '),
+    context.toLowerCase().replace(/ /g, '-'),
+    (mood + ' film score').trim()
+  ];
+
+  musicLinks.innerHTML = [
+    { label: `AudioJungle — "${mood || context}"`, url: `https://audiojungle.net/search?term=${encodeURIComponent(mood||context)}&category=music` },
+    { label: `Envato Elements — "${context}"`, url: `https://elements.envato.com/audio/music?q=${encodeURIComponent(mood||context)}` },
+    { label: `Envato Elements — Film Score`, url: `https://elements.envato.com/audio/music?q=${encodeURIComponent((mood||'') + ' film score cinemati')}` },
+    { label: `AudioJungle — Cinematic Tracks`, url: `https://audiojungle.net/search?term=cinematic+${encodeURIComponent(mood||'drama')}&category=music` },
+  ].map(item => `
+    <div class="music-item" onclick="window.open('${item.url}','_blank')">
+      <div class="music-icon">🎵</div>
+      <div class="music-info">
+        <div class="music-title">${item.label}</div>
+        <div class="music-meta">Envato · Licensed music for production use</div>
+      </div>
+      <a class="music-link" href="${item.url}" target="_blank">Browse →</a>
+    </div>
+  `).join('');
+
+  try {
+    const resp = await callClaude(
+      `Film scene details:\nMood/Style: ${mood}\nUsage: ${context}\nScene: ${scene}\n\nAs a professional film music supervisor, provide:\n1. Exact music genre and sub-genre recommendations for Envato/AudioJungle search\n2. Instrumentation suggestions\n3. BPM range and tempo feel\n4. 3-5 specific search keywords to use on AudioJungle\n5. Licensing advice for production use\n\nBe specific and practical.`,
+      'You are an experienced film music supervisor with deep knowledge of Envato AudioJungle. Respond in plain text.'
+    );
+    aiOut.textContent = resp;
+  } catch(e) {
+    aiOut.textContent = '⚠ AI offline. Use the Envato links above to search manually.';
+  }
+  aiOut.classList.remove('loading');
+  btn.disabled = false; btn.textContent = 'Find Music';
+}
+
+// ── PITCH DECK ──
+async function generatePitch() {
+  const title = document.getElementById('pitchTitle').value.trim();
+  const genre = document.getElementById('pitchGenre').value.trim();
+  const logline = document.getElementById('pitchLogline').value.trim();
+  const budget = document.getElementById('pitchBudget').value;
+  const audience = document.getElementById('pitchAudience').value.trim();
+  const usp = document.getElementById('pitchUSP').value.trim();
+
+  if (!title || !logline) { alert('Please enter at least a title and logline.'); return; }
+
+  const btn = document.getElementById('pitchBtn');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  document.getElementById('pitchOutput').style.display = 'block';
+
+  const out = document.getElementById('pitchAIOutput');
+  out.textContent = 'Crafting your pitch deck...';
+  out.classList.add('loading');
+
+  try {
+    const resp = await callClaude(
+      `Create a complete film pitch deck for:\nTitle: ${title}\nGenre: ${genre}\nLogline: ${logline}\nBudget: ${budget}\nTarget Audience: ${audience}\nUSP: ${usp}\n\nWrite content for each of these slides:\n1. TITLE SLIDE — Tagline and mood\n2. THE STORY — Logline + 3-paragraph synopsis\n3. WHY NOW — Market context, current demand\n4. TARGET AUDIENCE — Detailed audience profile\n5. COMPARABLE FILMS — 3 comps with box office\n6. THE TEAM — Director, key creative team (placeholders if unknown)\n7. PRODUCTION PLAN — Timeline, key milestones\n8. BUDGET OVERVIEW — Budget breakdown tiers\n9. DISTRIBUTION STRATEGY — Theatrical, OTT, international\n10. THE ASK — Investment ask, what it covers, ROI model\n\nFormat as: SLIDE X: [TITLE] followed by the content. Be professional, persuasive, and concise.`,
+      'You are a senior film producer and pitch consultant with 20 years experience raising finance for Indian and international films. Write professionally.'
+    );
+    out.textContent = resp;
+  } catch(e) {
+    out.textContent = '⚠ Could not connect to AI. Please check your connection and try again.';
+  }
+  out.classList.remove('loading');
+  btn.disabled = false; btn.textContent = 'Generate Pitch Deck Content';
+  addToRecent(title + ' (Pitch)');
+}
+
+
+// ══════════════════════════════════════════
+// ── CANVA INTEGRATION ──
+// ══════════════════════════════════════════
+
+const CANVA_MCP = "https://mcp.canva.com/mcp";
+
+function quickCanvaSearch(term) {
+  document.getElementById('canvaQuery').value = term;
+  searchCanvaDesigns();
+}
+
+function searchCanvaAfterPitch() {
+  const title = document.getElementById('pitchTitle').value.trim();
+  const genre = document.getElementById('pitchGenre').value.trim();
+  const query = (title || genre || 'pitch deck').substring(0, 30);
+  document.getElementById('canvaQuery').value = query;
+  searchCanvaDesigns();
+  // Scroll to canva results
+  document.getElementById('canvaResults').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function loadAllCanvaDesigns() {
+  document.getElementById('canvaQuery').value = '';
+  await fetchCanvaDesigns('');
+}
+
+async function searchCanvaDesigns() {
+  const query = document.getElementById('canvaQuery').value.trim();
+  await fetchCanvaDesigns(query);
+}
+
+async function fetchCanvaDesigns(query) {
+  const btn = document.getElementById('canvaSearchBtn');
+  btn.disabled = true; btn.textContent = 'Searching...';
+
+  const results = document.getElementById('canvaResults');
+  results.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;padding:12px">Searching your Canva library...</div>';
+
+  // Gemini does NOT support MCP tools — use direct Canva links + AI keyword suggestions
+  try {
+    // Ask Gemini for smart Canva search keywords based on the query
+    const aiKeywords = await callClaude(
+      `For a film production pitch deck search query: "${query || 'film pitch deck'}", suggest 3 specific Canva template search terms. Return ONLY a JSON array of 3 strings. Example: ["cinematic pitch deck", "film proposal dark", "movie poster template"]`,
+      'You are a film production designer. Return only a valid JSON array of 3 strings, nothing else.'
+    );
+
+    let keywords = [query || 'film pitch deck', 'film poster', 'pitch deck'];
+    try {
+      const parsed = JSON.parse(aiKeywords.replace(/```json|```/g,'').trim());
+      if (Array.isArray(parsed) && parsed.length) keywords = parsed;
+    } catch(e) {}
+
+    // Render smart Canva links using AI-suggested keywords
+    results.innerHTML = `
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px">
+        AI-suggested searches for <span style="color:var(--gold)">"${query || 'your project'}"</span> on Canva:
+      </div>
+      ${keywords.map(kw => `
+        <div class="music-item" style="margin-bottom:8px" onclick="window.open('https://www.canva.com/search/templates?q=${encodeURIComponent(kw)}','_blank')">
+          <div class="music-icon">🎨</div>
+          <div class="music-info">
+            <div class="music-title">${kw}</div>
+            <div class="music-meta">Canva Templates · Click to browse</div>
+          </div>
+          <a class="music-link" href="https://www.canva.com/search/templates?q=${encodeURIComponent(kw)}" target="_blank">Open →</a>
+        </div>`).join('')}
+      <hr style="border-color:var(--border);margin:10px 0"/>
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px">Your Canva library:</div>
+      ${[
+        { label: '📁 My Projects', url: 'https://www.canva.com/your-projects' },
+        { label: '🎬 Film Poster Templates', url: 'https://www.canva.com/search/templates?q=film+movie+poster' },
+        { label: '📊 Pitch Deck Templates', url: 'https://www.canva.com/search/templates?q=pitch+deck' },
+        { label: '🖼️ Mood Board Templates', url: 'https://www.canva.com/search/templates?q=mood+board+dark' },
+      ].map(item => `
+        <div class="music-item" style="margin-bottom:8px" onclick="window.open('${item.url}','_blank')">
+          <div class="music-icon">🎨</div>
+          <div class="music-info">
+            <div class="music-title">${item.label}</div>
+            <div class="music-meta">Canva · Click to open</div>
+          </div>
+          <a class="music-link" href="${item.url}" target="_blank">Open →</a>
+        </div>`).join('')}`;
+
+  } catch(e) {
+    // Pure fallback if AI also fails
+    renderCanvaDesigns([], query);
+  }
+
+  btn.disabled = false; btn.textContent = 'Search';
+}
+
+function parseDesignsFromText(text) {
+  try {
+    // Try direct JSON parse
+    const cleaned = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed.items && Array.isArray(parsed.items)) return parsed.items;
+  } catch(e) {}
+
+  // Try to extract JSON array from text
+  const match = text.match(/\[[\s\S]*\]/);
+  if (match) {
+    try { return JSON.parse(match[0]); } catch(e) {}
+  }
+  return [];
+}
+
+function renderCanvaDesigns(designs, query) {
+  const results = document.getElementById('canvaResults');
+
+  if (!designs || designs.length === 0) {
+    // Show direct Canva links as fallback
+    results.innerHTML = `
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">No saved designs found for "${query}". Browse Canva templates:</div>
+      ${[
+        { label: `🎨 "${query || 'film'}" Templates`, url: `https://www.canva.com/search/templates?q=${encodeURIComponent(query||'film pitch deck')}` },
+        { label: '📊 Pitch Deck Templates', url: 'https://www.canva.com/search/templates?q=pitch+deck+film' },
+        { label: '🎬 Film Poster Templates', url: 'https://www.canva.com/search/templates?q=film+movie+poster' },
+        { label: '🖼️ Mood Board Templates', url: 'https://www.canva.com/search/templates?q=mood+board' },
+        { label: '📁 My Canva Projects', url: 'https://www.canva.com/your-projects' },
+      ].map(item => `
+        <div class="music-item" onclick="window.open('${item.url}','_blank')">
+          <div class="music-icon">🎨</div>
+          <div class="music-info">
+            <div class="music-title">${item.label}</div>
+            <div class="music-meta">Canva · Click to open</div>
+          </div>
+          <a class="music-link" href="${item.url}" target="_blank">Open →</a>
+        </div>`).join('')}`;
+    return;
+  }
+
+  results.innerHTML = `
+    <div style="font-size:0.7rem;color:var(--muted);margin-bottom:4px">${designs.length} design${designs.length>1?'s':''} found</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      ${designs.map(d => `
+        <div class="result-card" onclick="window.open('${d.edit_url || d.view_url || '#'}','_blank')" style="cursor:pointer">
+          ${d.thumbnail_url
+            ? `<img src="${d.thumbnail_url}" loading="lazy" style="width:100%;aspect-ratio:16/9;object-fit:cover" onerror="this.style.display='none'"/>`
+            : `<div style="width:100%;aspect-ratio:16/9;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:2rem">🎨</div>`
+          }
+          <div class="result-card-info">
+            <div class="result-card-title">${d.title || 'Untitled Design'}</div>
+            <div class="result-card-meta">Canva · ${d.page_count ? d.page_count + ' pages' : 'Design'}</div>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              ${d.edit_url ? `<a class="result-card-link" href="${d.edit_url}" target="_blank">Edit →</a>` : ''}
+              ${d.view_url ? `<a class="result-card-link" href="${d.view_url}" target="_blank">View →</a>` : ''}
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ══════════════════════════════════════════
+
+let qnapSID = null; // session ID after login
+let qnapBase = '';  // base URL
+
+// ── Load saved settings on panel open ──
+function loadQnapSettings() {
+  const saved = JSON.parse(localStorage.getItem('qnapSettings') || '{}');
+  if (saved.host)    document.getElementById('qnapHost').value    = saved.host;
+  if (saved.port)    document.getElementById('qnapPort').value    = saved.port;
+  if (saved.user)    document.getElementById('qnapUser').value    = saved.user;
+  if (saved.folders) document.getElementById('qnapFolders').value = saved.folders;
+  if (saved.sid) {
+    qnapSID  = saved.sid;
+    qnapBase = saved.base;
+    setQnapConnected(true);
+  }
+}
+
+function qnapSaveSettings() {
+  const s = {
+    host:    document.getElementById('qnapHost').value.trim(),
+    port:    document.getElementById('qnapPort').value.trim(),
+    user:    document.getElementById('qnapUser').value.trim(),
+    folders: document.getElementById('qnapFolders').value.trim(),
+  };
+  localStorage.setItem('qnapSettings', JSON.stringify(s));
+  alert('Settings saved! Click Connect to test the connection.');
+}
+
+function setQnapConnected(ok) {
+  const pill = document.getElementById('qnapStatus');
+  if (ok) {
+    pill.className = 'status-pill ok';
+    pill.innerHTML = '<span class="dot"></span>Connected';
+    document.getElementById('qnapSearchBar').style.display = 'block';
+    buildFolderTabs();
+  } else {
+    pill.className = 'status-pill warn';
+    pill.innerHTML = '<span class="dot"></span>Not Connected';
+    document.getElementById('qnapSearchBar').style.display = 'none';
+  }
+}
+
+// ── Connect: authenticate with QNAP File Station API ──
+async function qnapConnect() {
+  const host = document.getElementById('qnapHost').value.trim();
+  const port = document.getElementById('qnapPort').value.trim() || '8080';
+  const user = document.getElementById('qnapUser').value.trim();
+  const pass = document.getElementById('qnapPass').value.trim();
+
+  if (!host || !user || !pass) {
+    alert('Please fill in QNAP address, username and password.'); return;
+  }
+
+  const btn = document.getElementById('qnapConnectBtn');
+  btn.disabled = true; btn.textContent = 'Connecting...';
+
+  // Determine protocol
+  const proto = (port === '443' || host.startsWith('https')) ? 'https' : 'http';
+  const cleanHost = host.replace(/^https?:\/\//, '');
+  qnapBase = `${proto}://${cleanHost}:${port}`;
+
+  try {
+    // QNAP File Station Auth endpoint
+    const loginURL = `${qnapBase}/cgi-bin/filemanager/utilRequest.cgi?func=login&user=${encodeURIComponent(user)}&passwd=${encodeURIComponent(btoa(pass))}&need_private_key=0`;
+    const res = await fetch(loginURL, { mode: 'cors' });
+    const data = await res.json();
+
+    if (data.sid) {
+      qnapSID = data.sid;
+      const saved = JSON.parse(localStorage.getItem('qnapSettings') || '{}');
+      saved.sid = qnapSID; saved.base = qnapBase;
+      localStorage.setItem('qnapSettings', JSON.stringify(saved));
+      setQnapConnected(true);
+      btn.textContent = '✓ Connected!';
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'Reconnect'; }, 2000);
+    } else {
+      throw new Error(data.error_msg || 'Login failed — check credentials');
+    }
+  } catch(e) {
+    // CORS fallback — guide user
+    document.getElementById('qnapResults').style.display = 'block';
+    document.getElementById('qnapResultsLabel').textContent = 'Connection Issue';
+    document.getElementById('qnapResultsGrid').innerHTML = '';
+    document.getElementById('qnapFileList').innerHTML = `
+      <div style="background:var(--surface);border:1px solid #c0392b44;border-radius:6px;padding:20px;line-height:1.9;font-size:0.82rem;color:var(--cream)">
+        <div style="color:#e74c3c;font-family:'DM Mono',monospace;font-size:0.75rem;margin-bottom:12px">CONNECTION ERROR</div>
+        <strong>Error:</strong> ${e.message}<br><br>
+        <strong style="color:var(--gold)">Most likely cause: CORS is blocked on your QNAP.</strong><br><br>
+        <strong>Fix Option 1 — Enable CORS on QNAP:</strong><br>
+        1. QNAP → Control Panel → Applications → Web Server<br>
+        2. Enable "Allow cross-origin resource sharing (CORS)"<br>
+        3. Add your GitHub Pages URL as allowed origin<br><br>
+        <strong>Fix Option 2 — Run a local proxy (recommended):</strong><br>
+        Ask me to generate a simple Node.js proxy script. You run it on your office PC and it bridges the connection securely.<br><br>
+        <button class="btn-gold" style="margin-top:4px" onclick="qnapProxyHelp()">Generate Proxy Script for Me</button>
+      </div>`;
+    btn.disabled = false; btn.textContent = 'Retry Connection';
+  }
+}
+
+// ── Build folder quick-access tabs ──
+function buildFolderTabs() {
+  const raw = document.getElementById('qnapFolders').value;
+  const folders = raw.split(',').map(f => f.trim()).filter(Boolean);
+  const tabs = document.getElementById('qnapFolderTabs');
+  tabs.innerHTML = folders.map(f => `
+    <span class="tag" onclick="qnapBrowseFolder('${f}')">${f}</span>
+  `).join('') + '<span class="tag" onclick="qnapSearch()">🔍 Search All</span>';
+}
+
+// ── Browse a specific folder ──
+async function qnapBrowseFolder(folder) {
+  if (!qnapSID) { alert('Please connect to QNAP first.'); return; }
+  document.getElementById('qnapResults').style.display = 'block';
+  document.getElementById('qnapResultsLabel').textContent = `Browsing: ${folder}`;
+  document.getElementById('qnapFileList').innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Loading...</div>';
+  document.getElementById('qnapResultsGrid').innerHTML = '';
+
+  try {
+    const url = `${qnapBase}/cgi-bin/filemanager/utilRequest.cgi?func=get_list&path=${encodeURIComponent(folder)}&sid=${qnapSID}&limit=50&sort=filename&dir=ASC`;
+    const res  = await fetch(url, { mode: 'cors' });
+    const data = await res.json();
+    renderQnapFiles(data.datas || [], folder);
+  } catch(e) {
+    document.getElementById('qnapFileList').innerHTML = `<div class="error-text">Could not load folder. ${e.message}</div>`;
+  }
+}
+
+// ── Search files ──
+async function qnapSearch() {
+  if (!qnapSID) { alert('Please connect to QNAP first.'); return; }
+  const query   = document.getElementById('qnapSearchQuery').value.trim();
+  const type    = document.getElementById('qnapSearchType').value;
+  const folders = document.getElementById('qnapFolders').value.split(',').map(f=>f.trim()).filter(Boolean);
+
+  if (!query) { qnapBrowseFolder(folders[0] || '/'); return; }
+
+  const btn = document.getElementById('qnapSearchBtn');
+  btn.disabled = true; btn.textContent = 'Searching...';
+  document.getElementById('qnapResults').style.display = 'block';
+  document.getElementById('qnapResultsLabel').textContent = `Search: "${query}"`;
+  document.getElementById('qnapFileList').innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Searching your NAS...</div>';
+  document.getElementById('qnapResultsGrid').innerHTML = '';
+
+  try {
+    // Search each root folder
+    let allFiles = [];
+    for (const folder of folders) {
+      const url = `${qnapBase}/cgi-bin/filemanager/utilRequest.cgi?func=search&sid=${qnapSID}&limit=30&keyword=${encodeURIComponent(query)}&path=${encodeURIComponent(folder)}`;
+      const res  = await fetch(url, { mode: 'cors' });
+      const data = await res.json();
+      if (data.datas) allFiles = allFiles.concat(data.datas);
+    }
+
+    // Filter by type
+    const extMap = {
+      video:   ['mp4','mov','avi','mkv','mxf','r3d','braw','prores','m4v','wmv'],
+      photo:   ['jpg','jpeg','png','tif','tiff','raw','arw','cr2','nef','dng','psd'],
+      audio:   ['mp3','wav','aac','aiff','flac','m4a'],
+      project: ['prproj','aep','fcp','fcpbundle','drp','xml','edl'],
+    };
+    if (type !== 'all') {
+      const exts = extMap[type] || [];
+      allFiles = allFiles.filter(f => exts.includes((f.filename||'').split('.').pop().toLowerCase()));
+    }
+
+    renderQnapFiles(allFiles, 'Search Results');
+
+    // AI suggestion
+    if (allFiles.length > 0) {
+      document.getElementById('qnapAIWrap').style.display = 'block';
+      const aiOut = document.getElementById('qnapAIOutput');
+      aiOut.textContent = 'Analysing results...';
+      aiOut.classList.add('loading');
+      try {
+        const fileNames = allFiles.slice(0,15).map(f=>f.filename).join(', ');
+        const resp = await callClaude(
+          `A film editor searched for "${query}" on their production NAS and found these files: ${fileNames}\n\nProvide:\n1. Which files look most relevant for their search\n2. Any missing files they should also look for\n3. Organisation tip for these assets\n\nBe brief and practical.`,
+          'You are a film post-production supervisor. Respond in plain text.'
+        );
+        aiOut.textContent = resp;
+      } catch(e) { aiOut.textContent = `Found ${allFiles.length} files matching "${query}".`; }
+      aiOut.classList.remove('loading');
+    }
+  } catch(e) {
+    document.getElementById('qnapFileList').innerHTML = `<div class="error-text">Search failed: ${e.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = 'Search';
+}
+
+// ── Render file results ──
+function renderQnapFiles(files, context) {
+  const grid = document.getElementById('qnapResultsGrid');
+  const list = document.getElementById('qnapFileList');
+  grid.innerHTML = ''; list.innerHTML = '';
+
+  if (!files || files.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">No files found.</div>';
+    return;
+  }
+
+  const imageExts = ['jpg','jpeg','png','tif','tiff','webp','bmp'];
+  const videoExts = ['mp4','mov','avi','mkv','mxf','m4v'];
+  const audioExts = ['mp3','wav','aac','aiff','flac','m4a'];
+
+  const images = [], others = [];
+  files.forEach(f => {
+    const ext = (f.filename||'').split('.').pop().toLowerCase();
+    if (imageExts.includes(ext)) images.push(f);
+    else others.push(f);
+  });
+
+  // Image grid
+  if (images.length) {
+    grid.style.display = 'grid';
+    images.forEach(f => {
+      const thumbURL = `${qnapBase}/cgi-bin/filemanager/utilRequest.cgi?func=thumbnail&sid=${qnapSID}&path=${encodeURIComponent((f.path||'') + '/' + f.filename)}&size=200`;
+      const card = document.createElement('div');
+      card.className = 'result-card';
+      card.innerHTML = `
+        <img src="${thumbURL}" loading="lazy" onerror="this.style.display='none'"/>
+        <div class="result-card-info">
+          <div class="result-card-title">${f.filename}</div>
+          <div class="result-card-meta">${formatSize(f.filesize)} · ${f.mt || 'Image'}</div>
+          <a class="result-card-link" href="${qnapBase}/cgi-bin/filemanager/utilRequest.cgi?func=download&sid=${qnapSID}&path=${encodeURIComponent(f.path||'')}&file_name=${encodeURIComponent(f.filename)}" target="_blank">Open →</a>
+        </div>`;
+      grid.appendChild(card);
+    });
+  }
+
+  // File list for videos, audio, projects
+  if (others.length) {
+    others.forEach(f => {
+      const ext  = (f.filename||'').split('.').pop().toLowerCase();
+      const icon = videoExts.includes(ext) ? '🎬' : audioExts.includes(ext) ? '🎵' : f.isfolder ? '📁' : '📄';
+      const item = document.createElement('div');
+      item.className = 'music-item';
+      item.innerHTML = `
+        <div class="music-icon">${icon}</div>
+        <div class="music-info">
+          <div class="music-title">${f.filename}</div>
+          <div class="music-meta">${f.path || context} · ${formatSize(f.filesize)}</div>
+        </div>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('${(f.path||'')}/${f.filename}');this.textContent='✓ Copied!'">Copy Path</button>`;
+      list.appendChild(item);
+    });
+  }
+}
+
+function formatSize(bytes) {
+  if (!bytes || bytes === '0') return '—';
+  const b = parseInt(bytes);
+  if (b > 1073741824) return (b/1073741824).toFixed(1) + ' GB';
+  if (b > 1048576)    return (b/1048576).toFixed(1) + ' MB';
+  if (b > 1024)       return (b/1024).toFixed(0) + ' KB';
+  return b + ' B';
+}
+
+// ── Proxy help ──
+function qnapProxyHelp() {
+  const host = document.getElementById('qnapHost').value || 'YOUR-QNAP-IP';
+  const port = document.getElementById('qnapPort').value || '8080';
+  document.getElementById('qnapFileList').innerHTML = `
+    <div style="background:#0d0d0d;border:1px solid var(--border);border-radius:6px;padding:20px;font-family:'DM Mono',monospace;font-size:0.72rem;line-height:2;color:var(--cream)">
+      <div class="result-tag">Node.js Proxy Script — save as proxy.js and run on your office PC</div>
+<pre style="white-space:pre-wrap;color:var(--gold)">
+// proxy.js — Run: node proxy.js
+const http  = require('http');
+const https = require('https');
+const url   = require('url');
+
+const QNAP_HOST = '${host}';
+const QNAP_PORT = ${port};
+const PROXY_PORT = 3333;
+
+http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+
+  const opts = {
+    hostname: QNAP_HOST, port: QNAP_PORT,
+    path: req.url, method: req.method,
+    headers: { ...req.headers, host: QNAP_HOST }
+  };
+  const proto = QNAP_PORT == 443 ? https : http;
+  const proxy = proto.request(opts, r => {
+    res.writeHead(r.statusCode, r.headers);
+    r.pipe(res, { end: true });
+  });
+  req.pipe(proxy, { end: true });
+  proxy.on('error', e => { res.writeHead(500); res.end(e.message); });
+}).listen(PROXY_PORT, () =>
+  console.log('QNAP Proxy running at http://localhost:' + PROXY_PORT)
+);
+</pre>
+      <div style="color:var(--muted);margin-top:8px">
+        1. Install Node.js from nodejs.org<br>
+        2. Save above as proxy.js<br>
+        3. Run: <span style="color:var(--gold)">node proxy.js</span><br>
+        4. Change QNAP Address in settings to: <span style="color:var(--gold)">localhost:3333</span>
+      </div>
+    </div>`;
+}
+</script>
+</body>
+</html>
